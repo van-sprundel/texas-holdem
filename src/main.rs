@@ -1,13 +1,32 @@
 use std::fmt::{Debug, Display, Formatter};
+use std::io::Read;
 use rand::prelude::SliceRandom;
 use rand::thread_rng;
 
 fn main() {
     let mut player = Player::new("Ramon");
     let mut b = Board::new(vec![player]);
+
+    let mut stdin = std::io::stdin();
+
     b.draw_card("ramon");
     b.draw_card("ramon");
-    println!("{:?}", b);
+    loop {
+        let mut buffer = String::new();
+        println!("Your cards: {:?}",b.get_cards("ramon"));
+        println!("What will be your move?");
+        stdin.read_line(&mut buffer);
+        match &*buffer.trim().to_lowercase() {
+            "raise" | "r" => {
+                println!("You raised!");
+            }
+            "c" | "call" => {
+                println!("You called!");
+            }
+            "q" | "quit" | "exit" | "e" => break,
+            _ => {}
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -74,6 +93,7 @@ impl Debug for Card {
         })
     }
 }
+
 impl Display for Card {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} of {}", match self.rank {
@@ -122,7 +142,7 @@ struct Board {
 }
 
 impl Board {
-    pub fn new(p:Vec<Player>)->Self {
+    pub fn new(p: Vec<Player>) -> Self {
         let mut players = Vec::with_capacity(4);
         players.extend(p);
         let mut deck = Deck::create_deck();
@@ -130,12 +150,15 @@ impl Board {
         Self {
             players,
             deck,
-            middle_cards: [None;5]
+            middle_cards: [None; 5],
         }
     }
-    pub fn draw_card(&mut self,name:&str) {
+    pub fn draw_card(&mut self, name: &str) {
         let player = self.players.iter_mut().find(|x| x.name == name.to_lowercase()).expect("Couldn't find player");
         player.cards.push(self.deck.draw());
+    }
+    pub fn get_cards(&self, name:&str)->&Vec<Card> {
+        &self.players.iter().find(|x| x.name == name.to_lowercase()).expect("Couldn't find player").cards
     }
 }
 
