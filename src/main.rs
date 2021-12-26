@@ -1,36 +1,65 @@
 use std::fmt::{Debug, Display, Formatter};
-use std::io::Read;
 use rand::prelude::SliceRandom;
 use rand::thread_rng;
 
 fn main() {
-    let mut player = Player::new("Ramon");
-    let mut b = Board::new(vec![player]);
+    let player1 = Player::new("Player");
+    let player2 = Player::new("CPU1");
+    let player3 = Player::new("CPU2");
+    let player4 = Player::new("CPU3");
+    let mut b = Board::new(vec![player1, player2, player3, player4]);
 
-    let mut stdin = std::io::stdin();
-
-    b.draw_card("ramon");
-    b.draw_card("ramon");
-    loop {
-        let mut buffer = String::new();
-        println!("Your cards: {:?}",b.get_cards("ramon"));
-        println!("What will be your move?");
-        stdin.read_line(&mut buffer);
-        match &*buffer.trim().to_lowercase() {
-            "raise" | "r" => {
-                println!("You raised!");
+    let stdin = std::io::stdin();
+    loop { // game loop
+        for (i, player) in b.players.iter_mut().enumerate() {
+            println!("It's {}'s turn!", player.name);
+            println!("{}'s cards: {:?}", player.name, player.cards);
+            loop {
+                println!("What will be the move?");
+                let mut buffer = String::new();
+                stdin.read_line(&mut buffer);
+                match &*buffer.trim().to_lowercase() {
+                    "raise" | "r" => {
+                        println!("Raised!");
+                        b.players_done = [false; 4];
+                        b.players_done[i] = true;
+                        break;
+                    }
+                    "c" | "call" => {
+                        println!("Called!");
+                        b.players_done[i] = true;
+                        break;
+                    }
+                    "q" | "quit" | "exit" | "e" => panic!("Quitting..."),
+                    _ => {}
+                }
             }
-            "c" | "call" => {
-                println!("You called!");
+            if b.players_done.iter().filter(|x| **x).count() == b.players_done.len() {
+                // println!("Everyone checked or called when a raise happened.");
+                b.players_done = [false; 4];
+                b.round += 1;
+                match b.round {
+                    1 => {
+                        println!("Show the first 3 cards.");
+                        println!("Cards in middle: {:?}", b.middle_cards);
+                    }
+                    2 => {
+                        println!("Show the 4th card.");
+                    }
+                    3 => {
+                        println!("Show the 5th card.");
+                        println!("Showtime, baby!");
+                        // showdown
+                    }
+                    _ => {}
+                }
             }
-            "q" | "quit" | "exit" | "e" => break,
-            _ => {}
         }
     }
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum Rank {
     Ace,
     Two,
@@ -48,7 +77,7 @@ enum Rank {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum Suit {
     Spades,
     Diamonds,
@@ -63,7 +92,7 @@ enum Color {
     Black,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 struct Card {
     suit: Suit,
     rank: Rank,
@@ -123,6 +152,8 @@ impl Display for Card {
 struct Player {
     name: String,
     cards: Vec<Card>,
+    balance: i32,
+    bet: i32,
 }
 
 impl Player {
@@ -130,34 +161,54 @@ impl Player {
         Self {
             name: name.to_lowercase().to_string(),
             cards: Vec::with_capacity(2),
+            balance: 10_000,
+            bet: 0,
         }
     }
 }
 
 #[derive(Debug, Clone)]
 struct Board {
+    round: u8,
     players: Vec<Player>,
+    players_done: [bool; 4],
     deck: Deck,
-    middle_cards: [Option<Card>; 5],
+    middle_cards: Vec<Card>,
 }
 
 impl Board {
     pub fn new(p: Vec<Player>) -> Self {
+        let mut deck = Deck::create_deck();
         let mut players = Vec::with_capacity(4);
         players.extend(p);
-        let mut deck = Deck::create_deck();
         deck.shuffle_deck();
-        Self {
-            players,
+        let mut board = Self {
+            round: 0,
+            players: players.clone(),
+            players_done: [false; 4],
             deck,
-            middle_cards: [None; 5],
+            middle_cards: Vec::with_capacity(5),
+        };
+
+        for x in players.iter() {
+            for _ in 0..2 {
+                board.draw_player(&x.name);
+            }
         }
+        for _ in 0..5 {
+            board.draw_middle();
+        }
+        board
     }
-    pub fn draw_card(&mut self, name: &str) {
+    pub fn draw_player(&mut self, name: &str) {
         let player = self.players.iter_mut().find(|x| x.name == name.to_lowercase()).expect("Couldn't find player");
         player.cards.push(self.deck.draw());
     }
-    pub fn get_cards(&self, name:&str)->&Vec<Card> {
+    pub fn draw_middle(&mut self) {
+        let card = self.deck.draw();
+        self.middle_cards.push(card);
+    }
+    pub fn get_cards(&self, name: &str) -> &Vec<Card> {
         &self.players.iter().find(|x| x.name == name.to_lowercase()).expect("Couldn't find player").cards
     }
 }
